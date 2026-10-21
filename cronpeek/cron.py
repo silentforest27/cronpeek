@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Iterable, Optional, Set
 
@@ -20,6 +20,18 @@ MONTH_NAMES = {
     "oct": 10,
     "nov": 11,
     "dec": 12,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "april": 4,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "september": 9,
+    "october": 10,
+    "november": 11,
+    "december": 12,
 }
 
 WEEKDAY_NAMES = {
@@ -58,6 +70,7 @@ class CronField:
 
     values: frozenset[int]
     restricted: bool
+    text: str = field(default="*", compare=False)
 
     def matches(self, value: int) -> bool:
         return value in self.values
@@ -136,7 +149,7 @@ def _parse_field(
     if any(value < minimum or value > maximum for value in values):
         raise ValueError("cron field value out of range")
 
-    return CronField(frozenset(values), restricted)
+    return CronField(frozenset(values), restricted, text=text)
 
 
 @dataclass(frozen=True)
@@ -273,10 +286,10 @@ def explain(cron: Cron) -> str:
     """Return a multi-line explanation of a parsed cron expression."""
     lines = [
         f"expression: {cron.expression}",
-        f"minute: {describe_field(cron.minute, 0, 59)}",
-        f"hour: {describe_field(cron.hour, 0, 23)}",
-        f"day of month: {describe_field(cron.day_of_month, 1, 31)}",
-        f"month: {describe_field(cron.month, 1, 12)}",
-        f"day of week: {describe_field(cron.day_of_week, 0, 6)}",
+        f"minute: {cron.minute.text}",
+        f"hour: {cron.hour.text}",
+        f"day of month: {cron.day_of_month.text}",
+        f"month: {cron.month.text}",
+        f"day of week: {cron.day_of_week.text}",
     ]
     return "\n".join(lines)
