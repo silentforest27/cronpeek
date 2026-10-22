@@ -19,7 +19,10 @@ def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
     if value.lower() == "now":
         return datetime.now()
 
-    candidate = value.replace(" ", "T")
+    candidate = value
+    if candidate[-1:] in ("Z", "z"):
+        candidate = candidate[:-1] + "+00:00"
+    candidate = candidate.replace(" ", "T")
     try:
         return datetime.fromisoformat(candidate)
     except ValueError:
@@ -116,8 +119,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         values = cron.next(after, args.count)
 
     output_format = args.output_format or "%Y-%m-%dT%H:%M:%S"
-    for value in values:
-        print(value.strftime(output_format))
+    try:
+        for value in values:
+            print(value.strftime(output_format))
+    except ValueError as exc:
+        print(f"cronpeek: invalid output format: {exc}", file=sys.stderr)
+        return 2
     return 0
 
 
