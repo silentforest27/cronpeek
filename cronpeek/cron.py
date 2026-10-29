@@ -226,6 +226,38 @@ class Cron:
             current -= timedelta(minutes=1)
         return result
 
+    def between(
+        self,
+        start: datetime,
+        end: datetime,
+        inclusive: bool = True,
+    ) -> list[datetime]:
+        """Return scheduled runs in the half-open or closed range ``[start, end]``.
+
+        When ``inclusive`` is ``False`` the upper bound is exclusive. Runs are
+        returned in ascending chronological order.
+        """
+        if end < start:
+            raise ValueError("end must not be before start")
+
+        current = start.replace(second=0, microsecond=0)
+        if current < start:
+            current += timedelta(minutes=1)
+
+        upper = end if inclusive else end - timedelta(microseconds=1)
+        upper = upper.replace(second=0, microsecond=0)
+        if upper > end:
+            upper -= timedelta(minutes=1)
+
+        result: list[datetime] = []
+        for _ in range(_MAX_SEARCH_MINUTES):
+            if current > upper:
+                break
+            if self.matches(current):
+                result.append(current)
+            current += timedelta(minutes=1)
+        return result
+
 
 def parse(expression: str) -> Cron:
     """Parse a cron expression into a :class:`Cron` object."""
