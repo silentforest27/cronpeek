@@ -62,6 +62,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="starting time in ISO 8601 format (default: now)",
     )
     parser.add_argument(
+        "--to",
+        dest="to_time",
+        help="ending time in ISO 8601 format for range enumeration",
+    )
+    parser.add_argument(
         "--format",
         dest="output_format",
         help="strftime format for displayed times",
@@ -109,11 +114,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     try:
         after = _parse_datetime(args.from_time)
+        end = _parse_datetime(args.to_time)
     except ValueError as exc:
         print(f"cronpeek: {exc}", file=sys.stderr)
         return 2
 
-    if args.previous:
+    if args.to_time is not None:
+        start = after if after is not None else datetime.now()
+        if end is None:
+            print("cronpeek: invalid ending time", file=sys.stderr)
+            return 2
+        values = cron.between(start, end)
+    elif args.previous:
         values = cron.previous(after, args.count)
     else:
         values = cron.next(after, args.count)
