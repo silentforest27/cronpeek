@@ -13,6 +13,7 @@ and calculate upcoming or previous execution times.
 - Common special strings such as `@daily`, `@hourly`, and `@weekly`.
 - Vixie-cron style day-of-month/day-of-week OR semantics when both
   fields are restricted.
+- Enumeration of scheduled runs in a time range.
 - No third-party runtime dependencies.
 
 ## Installation
@@ -49,6 +50,12 @@ Show previous runs:
 cronpeek "0 0 * * *" --previous --count 3 --from "2025-01-02T00:00:00"
 ```
 
+Enumerate runs in a time range:
+
+```bash
+cronpeek "0 * * * *" --from "2025-01-01T00:30" --to "2025-01-01T03:00"
+```
+
 Explain the fields:
 
 ```bash
@@ -71,6 +78,9 @@ job = parse("*/15 9-17 * * 1-5")
 print(job.matches(datetime(2025, 1, 6, 9, 30)))
 
 for run in job.next(datetime(2025, 1, 1, 0, 0), count=3):
+    print(run)
+
+for run in job.between(datetime(2025, 1, 1, 0, 30), datetime(2025, 1, 1, 3, 0)):
     print(run)
 ```
 

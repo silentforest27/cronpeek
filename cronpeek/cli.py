@@ -124,7 +124,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         if end is None:
             print("cronpeek: invalid ending time", file=sys.stderr)
             return 2
-        values = cron.between(start, end)
+        try:
+            values = cron.between(start, end)
+        except ValueError as exc:
+            print(f"cronpeek: {exc}", file=sys.stderr)
+            return 2
     elif args.previous:
         values = cron.previous(after, args.count)
     else:
