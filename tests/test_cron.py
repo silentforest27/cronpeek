@@ -19,6 +19,13 @@ class ParseTests(unittest.TestCase):
         # 2025-01-06 is a Monday
         self.assertTrue(job.matches(datetime(2025, 1, 6, 0, 0)))
 
+    def test_weekday_monday_alias(self):
+        job = parse("0 0 * * monday")
+        # 2025-01-06 is a Monday
+        self.assertTrue(job.matches(datetime(2025, 1, 6, 0, 0)))
+        # 2025-01-05 is a Sunday
+        self.assertFalse(job.matches(datetime(2025, 1, 5, 0, 0)))
+
     def test_special_strings(self):
         job = parse("@daily")
         self.assertEqual(job.expression, "0 0 * * *")

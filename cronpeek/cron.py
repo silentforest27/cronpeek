@@ -25,7 +25,6 @@ MONTH_NAMES = {
     "february": 2,
     "march": 3,
     "april": 4,
-    "may": 5,
     "june": 6,
     "july": 7,
     "august": 8,
@@ -38,6 +37,7 @@ MONTH_NAMES = {
 WEEKDAY_NAMES = {
     "sun": 0,
     "mon": 1,
+    "monday": 1,
     "tue": 2,
     "tues": 2,
     "tuesday": 2,
