@@ -232,10 +232,11 @@ class Cron:
         end: datetime,
         inclusive: bool = True,
     ) -> list[datetime]:
-        """Return scheduled runs in the half-open or closed range ``[start, end]``.
+        """Return scheduled runs in the range from ``start`` to ``end``.
 
-        When ``inclusive`` is ``False`` the upper bound is exclusive. Runs are
-        returned in ascending chronological order.
+        By default the upper bound is inclusive. When ``inclusive`` is ``False``
+        the upper bound is exclusive. Runs are returned in ascending
+        chronological order.
         """
         if end < start:
             raise ValueError("end must not be before start")
@@ -244,15 +245,14 @@ class Cron:
         if current < start:
             current += timedelta(minutes=1)
 
-        upper = end if inclusive else end - timedelta(microseconds=1)
-        upper = upper.replace(second=0, microsecond=0)
-        if upper > end:
-            upper -= timedelta(minutes=1)
-
         result: list[datetime] = []
         for _ in range(_MAX_SEARCH_MINUTES):
-            if current > upper:
-                break
+            if inclusive:
+                if current > end:
+                    break
+            else:
+                if current >= end:
+                    break
             if self.matches(current):
                 result.append(current)
             current += timedelta(minutes=1)

@@ -123,12 +123,52 @@ class SchedulingTests(unittest.TestCase):
             job.previous(count=-1)
 
 
+class BetweenTests(unittest.TestCase):
+    def test_inclusive_default(self):
+        job = parse("0 * * * *")
+        runs = job.between(datetime(2025, 1, 1, 0, 30), datetime(2025, 1, 1, 3, 0))
+        self.assertEqual(
+            runs,
+            [
+                datetime(2025, 1, 1, 1, 0),
+                datetime(2025, 1, 1, 2, 0),
+                datetime(2025, 1, 1, 3, 0),
+            ],
+        )
+
+    def test_exclusive_upper(self):
+        job = parse("0 * * * *")
+        runs = job.between(
+            datetime(2025, 1, 1, 0, 30),
+            datetime(2025, 1, 1, 3, 0),
+            inclusive=False,
+        )
+        self.assertEqual(
+            runs,
+            [
+                datetime(2025, 1, 1, 1, 0),
+                datetime(2025, 1, 1, 2, 0),
+            ],
+        )
+
+    def test_invalid_range(self):
+        job = parse("* * * * *")
+        with self.assertRaises(ValueError):
+            job.between(datetime(2025, 1, 2), datetime(2025, 1, 1))
+
+
 class ExplainTests(unittest.TestCase):
     def test_explain(self):
         job = parse("*/15 9-17 * * 1-5")
         text = explain(job)
         self.assertIn("minute: */15", text)
         self.assertIn("hour: 9-17", text)
+
+    def test_explain_exported(self):
+        from cronpeek import explain as exported_explain
+
+        job = parse("0 * * * *")
+        self.assertIn("expression:", exported_explain(job))
 
 
 class CliTests(unittest.TestCase):
