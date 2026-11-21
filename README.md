@@ -56,6 +56,12 @@ Enumerate runs in a time range:
 cronpeek "0 * * * *" --from "2025-01-01T00:30" --to "2025-01-01T03:00"
 ```
 
+By default, the ending time is included. Use `--exclusive` to exclude it:
+
+```bash
+cronpeek "0 * * * *" --from "2025-01-01T00:30" --to "2025-01-01T03:00" --exclusive
+```
+
 Explain the fields:
 
 ```bash

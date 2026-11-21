@@ -199,6 +199,55 @@ class CliTests(unittest.TestCase):
             ["2025-01-01T01:00:00", "2025-01-01T02:00:00"],
         )
 
+    def test_range_cli(self):
+        from cronpeek.cli import main
+        import io
+        import contextlib
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(
+                [
+                    "0 * * * *",
+                    "--from",
+                    "2025-01-01T00:30",
+                    "--to",
+                    "2025-01-01T03:00",
+                ]
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            buf.getvalue().strip().splitlines(),
+            [
+                "2025-01-01T01:00:00",
+                "2025-01-01T02:00:00",
+                "2025-01-01T03:00:00",
+            ],
+        )
+
+    def test_range_cli_exclusive(self):
+        from cronpeek.cli import main
+        import io
+        import contextlib
+
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = main(
+                [
+                    "0 * * * *",
+                    "--from",
+                    "2025-01-01T00:30",
+                    "--to",
+                    "2025-01-01T03:00",
+                    "--exclusive",
+                ]
+            )
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            buf.getvalue().strip().splitlines(),
+            ["2025-01-01T01:00:00", "2025-01-01T02:00:00"],
+        )
+
     def test_explain_cli(self):
         from cronpeek.cli import main
         import io

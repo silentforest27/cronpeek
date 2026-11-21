@@ -67,6 +67,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="ending time in ISO 8601 format for range enumeration",
     )
     parser.add_argument(
+        "--exclusive",
+        action="store_true",
+        help="exclude the ending time when enumerating a range",
+    )
+    parser.add_argument(
         "--format",
         dest="output_format",
         help="strftime format for displayed times",
@@ -125,7 +130,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("cronpeek: invalid ending time", file=sys.stderr)
             return 2
         try:
-            values = cron.between(start, end)
+            values = cron.between(start, end, inclusive=not args.exclusive)
         except ValueError as exc:
             print(f"cronpeek: {exc}", file=sys.stderr)
             return 2
