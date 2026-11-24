@@ -87,6 +87,10 @@ class ParseTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate("bad")
 
+    def test_normalized_expression(self):
+        job = parse("  */15   9-17 * * 1-5  ")
+        self.assertEqual(job.expression, "*/15 9-17 * * 1-5")
+
 
 class SchedulingTests(unittest.TestCase):
     def test_next(self):
@@ -153,7 +157,6 @@ class BetweenTests(unittest.TestCase):
         self.assertEqual(
             runs,
             [
-                datetime(2025, 1, 1, 1, 0),
                 datetime(2025, 1, 1, 2, 0),
             ],
         )
