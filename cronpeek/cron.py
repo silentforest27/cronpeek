@@ -1,151 +1,279 @@
+"""Core cron parsing and scheduling logic for cronpeek."""
+
 from __future__ import annotations
 
-import argparse
-import sys
-from datetime import datetime
-from typing import Optional
-
-from .cron import Cron, explain, parse, validate as validate_expression
+from datetime import datetime, timedelta
+from typing import Callable, Optional
 
 
-def _parse_datetime(value: Optional[str]) -> Optional[datetime]:
-    if value is None:
-        return None
-    value = value.strip()
-    if not value:
-        return None
-    if value.lower() == "now":
-        return datetime.now()
+SPECIAL_STRINGS = {
+    "@yearly": "0 0 1 1 *",
+    "@annually": "0 0 1 1 *",
+    "@monthly": "0 0 1 * *",
+    "@weekly": "0 0 * * 0",
+    "@daily": "0 0 * * *",
+    "@midnight": "0 0 * * *",
+    "@hourly": "0 * * * *",
+}
 
-    candidate = value
-    if candidate[-1:] in ("Z", "z"):
-        candidate = candidate[:-1] + "+00:00"
-    candidate = candidate.replace(" ", "T")
-    try:
-        return datetime.fromisoformat(candidate)
-    except ValueError:
-        pass
+MONTH_NAMES = {
+    "JAN": 1, "JANUARY": 1,
+    "FEB": 2, "FEBRUARY": 2,
+    "MAR": 3, "MARCH": 3,
+    "APR": 4, "APRIL": 4,
+    "MAY": 5,
+    "JUN": 6, "JUNE": 6,
+    "JUL": 7, "JULY": 7,
+    "AUG": 8, "AUGUST": 8,
+    "SEP": 9, "SEPTEMBER": 9,
+    "OCT": 10, "OCTOBER": 10,
+    "NOV": 11, "NOVEMBER": 11,
+    "DEC": 12, "DECEMBER": 12,
+}
 
-    formats = (
-        "%Y-%m-%d %H:%M:%S",
-        "%Y-%m-%d %H:%M",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%dT%H:%M",
-        "%Y-%m-%d",
-    )
-    for fmt in formats:
-        try:
-            return datetime.strptime(value, fmt)
-        except ValueError:
-            continue
-    raise ValueError(f"invalid datetime: {value!r}")
+DAY_NAMES = {
+    "SUN": 0, "SUNDAY": 0,
+    "MON": 1, "MONDAY": 1,
+    "TUE": 2, "TUESDAY": 2,
+    "WED": 3, "WEDNESDAY": 3,
+    "THU": 4, "THURSDAY": 4,
+    "FRI": 5, "FRIDAY": 5,
+    "SAT": 6, "SATURDAY": 6,
+}
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="cronpeek",
-        description="Parse, validate, and inspect cron expressions.",
-    )
-    parser.add_argument("expression", help="cron expression to inspect")
-    parser.add_argument(
-        "-n",
-        "--count",
-        type=int,
-        default=5,
-        help="number of times to display (default: 5)",
-    )
-    parser.add_argument(
-        "--from",
-        dest="from_time",
-        help="starting time in ISO 8601 format (default: now)",
-    )
-    parser.add_argument(
-        "--to",
-        dest="to_time",
-        help="ending time in ISO 8601 format for range enumeration",
-    )
-    parser.add_argument(
-        "--exclusive",
-        action="store_true",
-        help="exclude the ending time when enumerating a range",
-    )
-    parser.add_argument(
-        "--format",
-        dest="output_format",
-        help="strftime format for displayed times",
-    )
-    parser.add_argument(
-        "--validate",
-        action="store_true",
-        help="validate the expression and exit",
-    )
-    parser.add_argument(
-        "--explain",
-        action="store_true",
-        help="explain each cron field and exit",
-    )
-    parser.add_argument(
-        "--previous",
-        action="store_true",
-        help="show previous runs instead of upcoming runs",
-    )
+class CronField:
+    """A parsed cron field."""
 
-    args = parser.parse_args(argv)
+    def __init__(self, values: set[int], raw: str, restricted: bool):
+        self.values = set(values)
+        self.raw = raw
+        self.restricted = restricted
 
-    try:
-        cron: Cron = parse(args.expression)
-    except ValueError as exc:
-        print(f"cronpeek: {exc}", file=sys.stderr)
-        return 2
 
-    if args.validate:
-        try:
-            validate_expression(args.expression)
-        except ValueError as exc:
-            print(f"cronpeek: {exc}", file=sys.stderr)
-            return 2
-        print("valid")
-        return 0
+class Cron:
+    """A parsed cron expression."""
 
-    if args.explain:
-        print(explain(cron))
-        return 0
+    def __init__(self, expression: str, fields: list[CronField]):
+        self.expression = expression
+        self.fields = fields
+        self.minute = fields[0]
+        self.hour = fields[1]
+        self.day_of_month = fields[2]
+        self.month = fields[3]
+        self.day_of_week = fields[4]
 
-    if args.count < 0:
-        print("cronpeek: count must not be negative", file=sys.stderr)
-        return 2
+    def matches(self, dt: datetime) -> bool:
+        if dt.minute not in self.minute.values:
+            return False
+        if dt.hour not in self.hour.values:
+            return False
+        if dt.month not in self.month.values:
+            return False
+        if dt.day not in self.day_of_month.values:
+            dom_match = False
+        else:
+            dom_match = True
 
-    try:
-        after = _parse_datetime(args.from_time)
-        end = _parse_datetime(args.to_time)
-    except ValueError as exc:
-        print(f"cronpeek: {exc}", file=sys.stderr)
-        return 2
+        # cron uses 0=Sunday..6=Saturday
+        cron_dow = (dt.weekday() + 1) % 7
+        dow_match = cron_dow in self.day_of_week.values
 
-    if args.to_time is not None:
-        start = after if after is not None else datetime.now()
-        if end is None:
-            print("cronpeek: invalid ending time", file=sys.stderr)
-            return 2
-        try:
-            values = cron.between(start, end, inclusive=not args.exclusive)
-        except (ValueError, TypeError) as exc:
-            print(f"cronpeek: {exc}", file=sys.stderr)
-            return 2
-    elif args.previous:
-        values = cron.previous(after, args.count)
+        if self.day_of_month.restricted and self.day_of_week.restricted:
+            day_ok = dom_match or dow_match
+        else:
+            day_ok = dom_match and dow_match
+        return day_ok
+
+    def _matches(self, dt: datetime) -> bool:
+        return self.matches(dt)
+
+    def next(self, start: Optional[datetime] = None, count: int = 5) -> list[datetime]:
+        if count < 0:
+            raise ValueError("count must not be negative")
+        if count == 0:
+            return []
+        if start is None:
+            start = datetime.now()
+
+        result: list[datetime] = []
+        candidate = start.replace(second=0, microsecond=0)
+        if candidate <= start:
+            candidate = candidate + timedelta(minutes=1)
+
+        max_iterations = 4 * 366 * 24 * 60
+        iterations = 0
+        while len(result) < count and iterations < max_iterations:
+            if self._matches(candidate):
+                result.append(candidate)
+            candidate = candidate + timedelta(minutes=1)
+            iterations += 1
+        return result
+
+    def previous(self, start: Optional[datetime] = None, count: int = 5) -> list[datetime]:
+        if count < 0:
+            raise ValueError("count must not be negative")
+        if count == 0:
+            return []
+        if start is None:
+            start = datetime.now()
+
+        result: list[datetime] = []
+        candidate = start.replace(second=0, microsecond=0)
+        if candidate >= start:
+            candidate = candidate - timedelta(minutes=1)
+
+        max_iterations = 4 * 366 * 24 * 60
+        iterations = 0
+        while len(result) < count and iterations < max_iterations:
+            if self._matches(candidate):
+                result.append(candidate)
+            candidate = candidate - timedelta(minutes=1)
+            iterations += 1
+        return result
+
+    def between(
+        self,
+        start: datetime,
+        end: datetime,
+        inclusive: bool = True,
+    ) -> list[datetime]:
+        if start > end:
+            raise ValueError("start must not be after end")
+
+        result: list[datetime] = []
+        candidate = start.replace(second=0, microsecond=0)
+        while candidate <= end:
+            if candidate >= start and self._matches(candidate):
+                if inclusive or candidate < end:
+                    result.append(candidate)
+            candidate = candidate + timedelta(minutes=1)
+            if candidate > end and candidate.replace(second=0, microsecond=0) > end:
+                # guard against runaway loops on malformed bounds
+                break
+        return result
+
+
+def _to_number(
+    token: str,
+    names: Optional[dict[str, int]],
+    min_val: int,
+    max_val: int,
+) -> int:
+    token = token.strip()
+    if names is not None and token.upper() in names:
+        value = names[token.upper()]
     else:
-        values = cron.next(after, args.count)
-
-    output_format = args.output_format or "%Y-%m-%dT%H:%M:%S"
-    try:
-        for value in values:
-            print(value.strftime(output_format))
-    except (ValueError, TypeError) as exc:
-        print(f"cronpeek: invalid output format: {exc}", file=sys.stderr)
-        return 2
-    return 0
+        try:
+            value = int(token)
+        except ValueError:
+            raise ValueError(f"invalid value: {token!r}")
+    if value < min_val or value > max_val:
+        raise ValueError(f"value out of range: {value}")
+    return value
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+def _parse_field(
+    text: str,
+    min_val: int,
+    max_val: int,
+    names: Optional[dict[str, int]] = None,
+    normalize: Optional[Callable[[int], int]] = None,
+) -> CronField:
+    text = text.strip()
+    if not text:
+        raise ValueError("empty cron field")
+
+    restricted = text not in ("*", "?")
+    values: set[int] = set()
+
+    for part in text.split(","):
+        part = part.strip()
+        if not part:
+            raise ValueError("empty list item in cron field")
+
+        step = 1
+        base = part
+        if "/" in part:
+            base, step_str = part.split("/", 1)
+            base = base.strip()
+            try:
+                step = int(step_str.strip())
+            except ValueError:
+                raise ValueError(f"invalid step: {step_str!r}")
+            if step <= 0:
+                raise ValueError("step must be positive")
+
+        if base == "*":
+            lo, hi = min_val, max_val
+        elif base == "?":
+            lo, hi = min_val, max_val
+        elif "-" in base:
+            left, right = base.split("-", 1)
+            lo = _to_number(left, names, min_val, max_val)
+            hi = _to_number(right, names, min_val, max_val)
+            if lo > hi:
+                raise ValueError(f"invalid range: {base!r}")
+        else:
+            value = _to_number(base, names, min_val, max_val)
+            if "/" in part and step > 1:
+                lo, hi = value, max_val
+            else:
+                lo = hi = value
+
+        for value in range(lo, hi + 1, step):
+            if value < min_val or value > max_val:
+                continue
+            if normalize is not None:
+                value = normalize(value)
+            values.add(value)
+
+    if not values:
+        raise ValueError("cron field has no values")
+    return CronField(values, text, restricted)
+
+
+def parse(expression: str) -> Cron:
+    if not isinstance(expression, str):
+        raise ValueError("cron expression must be a string")
+    expr = expression.strip()
+    if not expr:
+        raise ValueError("empty cron expression")
+
+    lowered = expr.lower()
+    if lowered == "@reboot":
+        raise ValueError("@reboot is not supported")
+    if lowered in SPECIAL_STRINGS:
+        expr = SPECIAL_STRINGS[lowered]
+
+    tokens = expr.split()
+    if len(tokens) != 5:
+        raise ValueError("cron expression must have exactly 5 fields")
+
+    minute = _parse_field(tokens[0], 0, 59)
+    hour = _parse_field(tokens[1], 0, 23)
+    day_of_month = _parse_field(tokens[2], 1, 31)
+    month = _parse_field(tokens[3], 1, 12, MONTH_NAMES)
+    day_of_week = _parse_field(
+        tokens[4],
+        0,
+        7,
+        DAY_NAMES,
+        normalize=lambda value: 0 if value == 7 else value,
+    )
+
+    normalized = " ".join(tokens)
+    return Cron(normalized, [minute, hour, day_of_month, month, day_of_week])
+
+
+def validate(expression: str) -> bool:
+    parse(expression)
+    return True
+
+
+def explain(cron: Cron) -> str:
+    names = ["minute", "hour", "day of month", "month", "day of week"]
+    lines = [f"expression: {cron.expression}"]
+    for name, field in zip(names, cron.fields):
+        lines.append(f"{name}: {field.raw}")
+    return "\n".join(lines)
