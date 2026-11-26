@@ -149,8 +149,10 @@ class Cron:
 
         result: list[datetime] = []
         candidate = start.replace(second=0, microsecond=0)
+        if candidate < start:
+            candidate = candidate + timedelta(minutes=1)
         while candidate <= end:
-            if candidate >= start and self._matches(candidate):
+            if self._matches(candidate):
                 if inclusive or candidate < end:
                     result.append(candidate)
             candidate = candidate + timedelta(minutes=1)

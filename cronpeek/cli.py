@@ -92,7 +92,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="show previous runs instead of upcoming runs",
     )
 
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as exc:
+        code = exc.code
+        if code is None:
+            return 0
+        try:
+            return int(code)
+        except (TypeError, ValueError):
+            return 1
 
     try:
         cron: Cron = parse(args.expression)
