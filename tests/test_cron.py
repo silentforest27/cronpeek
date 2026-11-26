@@ -109,6 +109,21 @@ class SchedulingTests(unittest.TestCase):
         job = parse("* * * * *")
         self.assertEqual(job.next(datetime(2025, 1, 1, 0, 0), count=0), [])
 
+    def test_next_multiple_leap_days(self):
+        job = parse("0 0 29 2 *")
+        self.assertEqual(
+            job.next(datetime(2020, 3, 1, 0, 0), count=3),
+            [
+                datetime(2024, 2, 29, 0, 0),
+                datetime(2028, 2, 29, 0, 0),
+                datetime(2032, 2, 29, 0, 0),
+            ],
+        )
+
+    def test_next_no_occurrence_terminates(self):
+        job = parse("0 0 30 2 *")
+        self.assertEqual(job.next(datetime(2025, 1, 1, 0, 0), count=1), [])
+
     def test_previous(self):
         job = parse("0 * * * *")
         runs = job.previous(datetime(2025, 1, 1, 2, 30), count=3)
@@ -125,6 +140,16 @@ class SchedulingTests(unittest.TestCase):
         job = parse("0 * * * *")
         runs = job.previous(datetime(2025, 1, 1, 2, 0), count=1)
         self.assertEqual(runs, [datetime(2025, 1, 1, 1, 0)])
+
+    def test_previous_multiple_leap_days(self):
+        job = parse("0 0 29 2 *")
+        self.assertEqual(
+            job.previous(datetime(2032, 3, 1, 0, 0), count=2),
+            [
+                datetime(2032, 2, 29, 0, 0),
+                datetime(2028, 2, 29, 0, 0),
+            ],
+        )
 
     def test_negative_count(self):
         job = parse("* * * * *")
@@ -157,6 +182,7 @@ class BetweenTests(unittest.TestCase):
         self.assertEqual(
             runs,
             [
+                datetime(2025, 1, 1, 1, 0),
                 datetime(2025, 1, 1, 2, 0),
             ],
         )

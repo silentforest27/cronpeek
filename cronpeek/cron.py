@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 
+MAX_SEARCH_MINUTES = 5 * 366 * 24 * 60
+
 SPECIAL_STRINGS = {
     "@yearly": "0 0 1 1 *",
     "@annually": "0 0 1 1 *",
@@ -101,13 +103,15 @@ class Cron:
         if candidate <= start:
             candidate = candidate + timedelta(minutes=1)
 
-        max_iterations = 4 * 366 * 24 * 60
-        iterations = 0
-        while len(result) < count and iterations < max_iterations:
+        gap = 0
+        while len(result) < count:
             if self._matches(candidate):
                 result.append(candidate)
+                gap = 0
             candidate = candidate + timedelta(minutes=1)
-            iterations += 1
+            gap += 1
+            if gap > MAX_SEARCH_MINUTES:
+                break
         return result
 
     def previous(self, start: Optional[datetime] = None, count: int = 5) -> list[datetime]:
@@ -123,13 +127,15 @@ class Cron:
         if candidate >= start:
             candidate = candidate - timedelta(minutes=1)
 
-        max_iterations = 4 * 366 * 24 * 60
-        iterations = 0
-        while len(result) < count and iterations < max_iterations:
+        gap = 0
+        while len(result) < count:
             if self._matches(candidate):
                 result.append(candidate)
+                gap = 0
             candidate = candidate - timedelta(minutes=1)
-            iterations += 1
+            gap += 1
+            if gap > MAX_SEARCH_MINUTES:
+                break
         return result
 
     def between(
@@ -148,9 +154,6 @@ class Cron:
                 if inclusive or candidate < end:
                     result.append(candidate)
             candidate = candidate + timedelta(minutes=1)
-            if candidate > end and candidate.replace(second=0, microsecond=0) > end:
-                # guard against runaway loops on malformed bounds
-                break
         return result
 
 
