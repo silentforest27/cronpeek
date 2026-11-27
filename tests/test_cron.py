@@ -120,6 +120,16 @@ class SchedulingTests(unittest.TestCase):
             ],
         )
 
+    def test_next_century_leap_day(self):
+        job = parse("0 0 29 2 *")
+        self.assertEqual(
+            job.next(datetime(2096, 3, 1, 0, 0), count=2),
+            [
+                datetime(2104, 2, 29, 0, 0),
+                datetime(2108, 2, 29, 0, 0),
+            ],
+        )
+
     def test_next_no_occurrence_terminates(self):
         job = parse("0 0 30 2 *")
         self.assertEqual(job.next(datetime(2025, 1, 1, 0, 0), count=1), [])
@@ -148,6 +158,16 @@ class SchedulingTests(unittest.TestCase):
             [
                 datetime(2032, 2, 29, 0, 0),
                 datetime(2028, 2, 29, 0, 0),
+            ],
+        )
+
+    def test_previous_century_leap_day(self):
+        job = parse("0 0 29 2 *")
+        self.assertEqual(
+            job.previous(datetime(2105, 3, 1, 0, 0), count=2),
+            [
+                datetime(2104, 2, 29, 0, 0),
+                datetime(2096, 2, 29, 0, 0),
             ],
         )
 

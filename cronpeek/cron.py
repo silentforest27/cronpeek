@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 
-MAX_SEARCH_MINUTES = 5 * 366 * 24 * 60
+MAX_SEARCH_MINUTES = 10 * 366 * 24 * 60
 
 SPECIAL_STRINGS = {
     "@yearly": "0 0 1 1 *",
